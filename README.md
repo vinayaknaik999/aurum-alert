@@ -37,14 +37,17 @@ Before you begin, ensure you have:
 
 ## 🧠 Technical Highlights (The "Geek" Stuff)
 
-### 1. The Lightweight Parser
-Instead of heavy Selenium or headless browser scraping, we hit server-rendered HTML and extract the inline JSON products array. This is faster, consumes less CPU, and is significantly harder to detect.
+### 1. Market-Spot Price Engine
+Instead of unreliable HTML scraping, `aurum-alert` calculates the true India market rate by combining **Live Gold Spot Prices (XAU/XAG)** with real-time **USD/INR exchange rates**, factoring in the precise import duty and GST.
 
-### 2. Zero-Server Push API
-Most developers think you need Firebase for notifications. This project shows you how to use **VAPID keys** and the native `web-push` protocol to send alerts directly from a Worker to a Service Worker.
+### 2. The Lightweight Parser
+For product deals, we skip heavy headless browsers. We hit server-rendered HTML and extract inline JSON product arrays directly. Faster, cheaper, and resilient.
 
-### 3. Svelte 5 Runes
-Leveraging the power of `$state` and `$derived` for a reactive, lightning-fast UI that feels like a native desktop app.
+### 3. Zero-Server Push API
+This project demonstrates how to use **VAPID keys** and the native `web-push` protocol to send alerts directly from a Worker to a Service Worker—no Firebase or third-party servers required.
+
+### 4. Svelte 5 Runes
+Powered by `$state` and `$derived` for a ultra-reactive UI that feels like a premium desktop application.
 
 ---
 

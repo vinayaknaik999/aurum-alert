@@ -18,49 +18,69 @@ interface UserSettings {
 
 const UA_DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
-async function getHash(input: string): Promise<string> {
-    const msgUint8 = new TextEncoder().encode(input);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// ── SPOT PRICE ENGINE ────────────────────────────────────────────────────────
+const TROY_OZ_TO_GRAM = 31.1035;
+const IMPORT_DUTY = 0.06; // 6% current India import duty
+const GST = 0.03;         // 3% GST on gold/silver
+
+const PURITY = {
+    '24K': 1.0000,
+    '22K': 0.9167,
+    '18K': 0.7500,
+};
+
+async function fetchSpotPrices() {
+    const [goldRes, silverRes, fxRes] = await Promise.all([
+        fetch('https://api.gold-api.com/price/XAU'),
+        fetch('https://api.gold-api.com/price/XAG'),
+        fetch('https://api.frankfurter.app/latest?from=USD&to=INR'),
+    ]);
+
+    const [goldData, silverData, fxData]: any[] = await Promise.all([
+        goldRes.json(),
+        silverRes.json(),
+        fxRes.json(),
+    ]);
+
+    return {
+        goldSpotUSD: goldData.price,
+        silverSpotUSD: silverData.price,
+        usdInr: fxData.rates.INR,
+    };
 }
 
-function jsonResp(data: unknown, status = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        }
-    });
+function calcINRperGram(spotUSD: number, usdInr: number) {
+    return (spotUSD / TROY_OZ_TO_GRAM) * usdInr * (1 + IMPORT_DUTY) * (1 + GST);
 }
 
-// ── SCRAPER LOGIC ─────────────────────────────────────────────────────────────
 async function fetchGoldRate() {
     try {
-        const res = await fetch('https://www.bankbazaar.com/gold-rate-bangalore.html', {
-            headers: { 'User-Agent': UA_DESKTOP }
-        });
-        const text = await res.text();
-        const m24 = text.match(/24\s*Karat\s*Gold.*?₹\s*([\d,]+)/i);
-        const m22 = text.match(/22\s*Karat\s*Gold.*?₹\s*([\d,]+)/i);
+        const { goldSpotUSD, silverSpotUSD, usdInr } = await fetchSpotPrices();
 
-        let rate24 = m24 ? parseInt(m24[1].replace(/,/g, ''), 10) : 9200;
-        let rate22 = m22 ? parseInt(m22[1].replace(/,/g, ''), 10) : 8433;
+        const base24K = calcINRperGram(goldSpotUSD, usdInr);
+        const baseSilver = calcINRperGram(silverSpotUSD, usdInr);
 
-        // Normalization
-        if (rate24 > 30000) rate24 = Math.round(rate24 / 10);
-        if (rate22 > 30000) rate22 = Math.round(rate22 / 10);
-
-        return { rate24KT: rate24, rate22KT: rate22, updatedAt: new Date().toISOString() };
+        return {
+            rate24KT: Math.round(base24K),
+            rate22KT: Math.round(base24K * PURITY['22K']),
+            rate18KT: Math.round(base24K * PURITY['18KT']),
+            silver999: Math.round(baseSilver),
+            updatedAt: new Date().toISOString(),
+            source: 'spot-price-engine',
+        };
     } catch {
-        return { rate24KT: 9200, rate22KT: 8433, updatedAt: new Date().toISOString() };
+        return {
+            rate24KT: 9200,
+            rate22KT: 8433,
+            rate18KT: 6900,
+            silver999: 90,
+            updatedAt: new Date().toISOString(),
+            source: 'hardcoded-fallback',
+        };
     }
 }
 
+// ── SCRAPER LOGIC ─────────────────────────────────────────────────────────────
 async function fetchMyntra() {
     const url = 'https://www.myntra.com/gold-coin';
     const res = await fetch(url, { headers: { 'User-Agent': UA_DESKTOP } });
@@ -126,8 +146,6 @@ export default {
             for (const p of products) {
                 if (notifiedIds.has(String(p.productId))) continue;
 
-                // Simple check: is price lower than user's target?
-                // Note: Simplified logic for boilerplate
                 const isBlink = (p.product || '').toLowerCase().includes('blink');
                 if (isBlink && user.notifyBlinkdeals) {
                     dealsToNotify.push(p);
@@ -155,3 +173,23 @@ export default {
         }
     }
 };
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+async function getHash(input: string): Promise<string> {
+    const msgUint8 = new TextEncoder().encode(input);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function jsonResp(data: unknown, status = 200): Response {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+    });
+}
