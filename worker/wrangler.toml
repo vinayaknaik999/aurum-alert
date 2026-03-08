@@ -1,0 +1,16 @@
+name = "aurum-alert-worker"
+main = "src/index.ts"
+compatibility_date = "2024-04-05"
+node_compat = true
+
+[vars]
+VAPID_SUBJECT = "mailto:admin@example.com"
+VAPID_PUBLIC_KEY = ""
+VAPID_PRIVATE_KEY = ""
+
+[[kv_namespaces]]
+binding = "ALERTS_STORAGE"
+id = "" # To be filled by user
+
+[triggers]
+crons = ["0 * * * *"] # Every 1 hour by default for Lite version

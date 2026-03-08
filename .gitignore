@@ -1,0 +1,14 @@
+node_modules
+.svelte-kit
+build
+.output
+.wrangler
+.dev.vars
+.env
+.env.*
+!.env.example
+.DS_Store
+__MACOSX
+logs
+*.log
+dist
